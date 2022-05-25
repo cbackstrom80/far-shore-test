@@ -1,0 +1,10 @@
+redis==4.3.1
+requests==2.27.1
+signalfx==1.1.14
+sseclient-py==1.7.2
+stack-data==0.2.0
+typing-extensions==4.2.0
+urllib3==1.26.9
+wcwidth==0.2.5
+ws4py==0.5.1
+zipp==3.8.0
