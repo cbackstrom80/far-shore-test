@@ -1,214 +1,178 @@
-import argparse
+import asyncio
 import json
+import time
+from typing import Dict, Any, List, Tuple
+import requests
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from itertools import repeat
+from aiohttp import ClientSession
+import signalfx
+import sys
 import os
 import logging
-import sys
-import time
-#import pandas as pd
-import asyncio
 from random import randint, randrange
 from datetime import datetime, timedelta
 
-import redis
-redis = redis.Redis(
-    host='redis',
-    port='6379')
+########  VARIABLES ##########
+import yaml
+with open("far-shore-config.yaml", "r") as yamlfile:
+     data = yaml.load(yamlfile, Loader=yaml.FullLoader)
+     print("Config Loaded Successfully  ")
+REALM = data['farshore']['app']['options']['test-target-realm']
+LOCALE = data['farshore']['app']['options']['test-src-locale']
+METRICBASENAME = data['farshore']['app']['options']['test-metric-base-name']
+TOKEN = 'XnI5SWNNVv_uoCURsap5TA'
+OTELCOLLECTORINGEST = data['farshore']['app']['options']['otelcollectoringest']
+SFXAPIURL = data['farshore']['app']['options']['sfx-api-url']
+
+
+
+
+def http_get_with_requests(url: str, headers: Dict = {}, proxies: Dict = {}, timeout: int = 10) -> (int, Dict[str, Any], bytes):
+    response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
+
+    response_json = None
+    try:
+        response_json = response.json()
+    except:
+        pass
+
+    response_content = None
+    try:
+        response_content = response.content
+    except:
+        pass
+
+    return (response.status_code, response_json, response_content)
+def http_get_with_requests_parallel(list_of_urls: List[str], headers: Dict = {}, proxies: Dict = {}, timeout: int = 10) -> (List[Tuple[int, Dict[str, Any], bytes]], float):
+    t1 = time.time()
+    results = []
+    executor = ThreadPoolExecutor(max_workers=100)
+    for result in executor.map(http_get_with_requests, list_of_urls, repeat(headers), repeat(proxies), repeat(timeout)):
+        results.append(result)
+    t2 = time.time()
+    t = t2 - t1
+    return results, t
+async def http_get_with_aiohttp(session: ClientSession, url: str, headers: Dict = {}, proxy: str = None, timeout: int = 10) -> (int, Dict[str, Any], bytes):
+    response = await session.get(url=url, headers=headers, proxy=proxy, timeout=timeout)
+    print('-----------')
+    print('-----------')
+    print('-----------')
+    print('-----------')
+    print('-----------')
+    print(response.status)
+
+    response_json = None
+    try:
+        response_json = await response.json(content_type=None)
+    except json.decoder.JSONDecodeError as e:
+        pass
+
+    response_content = None
+    try:
+        response_content = await response.read()
+    except:
+        pass
+
+    return (response.status, response_json, response_content)
+async def sendmetric(randvalue):
+
+
+    # TODO: TIME TO ACK
+    client = signalfx.SignalFx(api_endpoint=SFXAPIURL,
+                               ingest_endpoint=OTELCOLLECTORINGEST)
+    ingest = client.ingest(TOKEN)
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+    now = datetime.now()
+
+    start_time = now.timestamp()
+    payload = ingest.send(gauges=[{
+        'metric': 'nike.testing.metric',
+        'value': start_time,
+        'dimensions': {'source-locale': LOCALE,
+                       'realm': REALM,
+                       'randomvalue':str(randvalue)
+                       }
+    }])
+    return (True)
+
+def post_results_to_sfx(avg_speed,LOCALE,REALM):
+
+
+    # TODO: TIME TO ACK
+    client = signalfx.SignalFx(api_endpoint=SFXAPIURL,
+                               ingest_endpoint=OTELCOLLECTORINGEST)
+    ingest = client.ingest(TOKEN)
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+    now = datetime.now()
+
+    start_time = now.timestamp()
+    payload = ingest.send(gauges=[{
+        'metric': 'nike.farshore.testing.avg_time_seconds',
+        'value': avg_speed,
+        'dimensions': {
+                    'source-locale': LOCALE,
+                       'realm': REALM,
+                      #'timetoglass': str(100),
 
-# VARS ##
-token = 'XnI5SWNNVv_uoCURsap5TA'
-REALM = "us1"
+                }
+    }])
+    return (True)
 
-otelingest = "http://splunk-otel-collector:9943"
+async def http_get_with_aiohttp_parallel(randvalue, session: ClientSession, list_of_urls: List[str], headers: Dict = {"Content-Type": "application/json", "X-SF-Token": TOKEN}, proxy: str = None, timeout: int = 10) -> (List[Tuple[int, Dict[str, Any], bytes]], float):
+    print('debug URLS')
+    print(list_of_urls)
+    print('--------------')
+    print('debug Headers')
+    print(headers)
+    print('--------------')
 
+    t1 = time.time()
+    results1 =await asyncio.create_task(sendmetric(randvalue))
+    results2 = await asyncio.gather(*[http_get_with_aiohttp(session, url, headers, proxy, timeout) for url in list_of_urls])
+    t2 = time.time()
+    t = t2 - t1
 
+    return results1,results2, t
 
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..'))
-import signalfx  # noqa
+async def main():
 
+    print('Waiting 20seconds for Collector to come online')
+    print('--------------------')
+    time.sleep(20)
 
 
 
-class sfxroundtrip:
-    start_time = datetime.now().timestamp()
-    def sendmetric(token, otelingest, start_time):
-
-        # TODO: TIME TO ACK
-        client = signalfx.SignalFx(api_endpoint="https://api.{REALM}.signalfx.com".format(REALM=REALM),
-                                   ingest_endpoint=otelingest,
-                                   stream_endpoint='https://stream.{REALM}.signalfx.com'.format(REALM=REALM))
-        ingest = client.ingest(token)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-        print("Sending in Value:{}".format(randvalue))
-
-        payload = ingest.send(gauges=[{
-            'metric': 'nike.testing.metric',
-            'value': start_time,
-            'dimensions': {'timestamp': str(datetime.now().timestamp()), 'realm': REALM, 'randomvalue': str(randvalue)}
-        }])
-        return (True)
-
-        # Read The Metric from the API endpoint
-    def getmetric(rando, token):
-        import requests
-        import json
-        import pprint
-
-        match = 0
-        while match == 0:
-            try:
-                query = 'sf_metric:nike.testing.metric AND randomvalue:{}'.format(rando)
-                base_url = 'https://api.us1.signalfx.com/v1/timeserieswindow?query='
-
-                resp = requests.get(url=base_url + query,
-                                    headers={"Content-Type": "application/json", "X-SF-Token": token},
-                                    params=None)
-                data = resp.json()  # Check the JSON Response Content documentation below
-                for i in data['data']:
-                    for k in data['data'][i]:
-                        print("Looking for metric number: {}".format(rando))
-                        print(k)
-                        if rando == k[1]:
-                            print(str(k[1]), str(k[0]))
-                            print("Weve Found a Match!  Carry on!")
-                            match = 1
-                            return (True)
-            except:
-                "Try Again"
-
-
-
-    def trip(randvalue, token, otelingest):
-        if sfxroundtrip.sendmetric(randvalue, token, otelingest) == True:
-            if sfxroundtrip.getmetric(randvalue, token) == True:
-
-
-
-
-                read_time = datetime.now()
-
-                # TODO: TIME TO ACK
-                client = signalfx.SignalFx(api_endpoint="https://api.{REALM}.signalfx.com".format(REALM=REALM),
-                                           ingest_endpoint=otelingest,
-                                           stream_endpoint='https://stream.{REALM}.signalfx.com'.format(REALM=REALM))
-                ingest = client.ingest(token)
-                logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-                print("Test Start Time is {}".format(sfxroundtrip.start_time))
-                print("Test End Time is {}".format(read_time))
-
-
-
-
-                diff = read_time - sfxroundtrip.start_time
-                value = diff.total_seconds() * 1000
-
-                print("The Time To Glass is {}".format(diff.total_seconds()))
-                payload = ingest.send(gauges=[{
-                    'metric': 'nike.testing.result',
-                    'value': value,
-                    'dimensions': {'origin': "NIKE-CN", 'realm': REALM, 'ingest_start': str(sfxroundtrip.start_time),
-                                   'read_time': str(read_time), }
-                },
-                ])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#Report results back to SOS for charting purposes
-
-
-
-#RUNNER
-""" async def main():
-    keys = ['ingress_start_time', 'api_time_to_console', 'time_delta']
-    #record = {"ingress_start_time":[],"api_time_to_console":[],"time_delta":[]};
-    record = []
-    origin =""
-    inc = 1
-    index = 1
-
-
-    while inc == 1:
-        randvalue = randrange(1000000, 9999999)
-        task1 = asyncio.create_task(sendmetric(randvalue, token, otelingest))
-        #task2 = asyncio.create_task(getmetric(randvalue, token))
-
-        now = datetime.now()
-
-        start_time = now.timestamp()
-        print(f"started at {start_time}")
-
-
-        await task1
-        #await task2
-        now = datetime.now()
-        end_time = now.timestamp()
-        print(f"finished at {end_time}")
-
-        diff = (start_time - end_time)
-        print("Difference in time is: {} ms.".format(diff))
-
-
-        index = index + 1
-
-
-        #redis.set('farshore_test_'+ str(index), json.dumps({'start-time':float(start_time),'end-time':float(end_time),'latency':float(diff)}))
-        #farshore = redis.keys('farshore_test*')
-        #print(farshore)
-        sendtosfx = asyncio.create_task(reporttosfx(token,origin, diff,sendmetric(randvalue, token, otelingest),getmetric(randvalue, token)))
-        await sendtosfx
-
-
-
-        time.sleep(1)"""
-
-#TODO ADD SPAN TEST
-#TODO ADD PERFORMANCE
-#TODO % of failures/retrys
-#TODO META FOR ORIGIN
-#TODO OTEL COLLECTOR AND DOCKER COMPOSE
-
-
-
-
-"""def farshore_test_and_report():
-    inc = 1
-    origin = "NIKE-CN"
-
+    # Benchmark aiohttp
+    session = ClientSession()
+    speeds_aiohttp = []
     randvalue = randrange(1000000, 9999999)
-    sfxroundtrip.trip(randvalue,token,otelingest)
-    time.sleep(1)
+    for i in range(0, 1):
+
+        urls = [
+            "https://api.us1.signalfx.com/v1/timeserieswindow?query=sf_metric:nike.testing.metric AND randomvalue:{}".format(randvalue)
+            for i in range(0, 10)]
+        results1, results2, t = await http_get_with_aiohttp_parallel(randvalue,  session, urls)
+        print(results2)
+        v = len(urls) / t
+        print('AIOHTTP: Took ' + str(round(t, 2)) + ' s, with speed of ' + str(round(v, 2)) + ' r/s')
+        speeds_aiohttp.append(v)
+        ttg=round(t, 2)
+    await session.close()
+
+    print('--------------------')
 
 
-farshore_test_and_report()"""
 
-time.sleep(20)
-while 1 == 1: # FOREVER
-    randvalue = randrange(1000000, 9999999)
-    #sfxroundtrip.trip(randvalue, token, otelingest)
-    sfxroundtrip.sendmetric(token, otelingest, datetime.now().timestamp())
-    time.sleep(1)
+    # Calculate averages
+    avg_speed_aiohttp = sum(speeds_aiohttp) / len(speeds_aiohttp)
 
+    print('--------------------')
+    print('AVG ROUNDTRIO SPEED USING AIOHTTP: ' + str(round(avg_speed_aiohttp, 2)) + ' r/s')
 
-
-
-#asyncio.run(main())
-
+    post_results_to_sfx(ttg,LOCALE,REALM)
+while 1==1:
+    asyncio.run(main())

@@ -1,11 +1,6 @@
 version: "3"
 services:
-  redis:
-    image: 'bitnami/redis:latest'
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    ports:
-      - "6379:6379"
+
   splunk-otel-collector:
     image: quay.io/signalfx/splunk-otel-collector:latest
     environment:
@@ -24,6 +19,7 @@ services:
       - "9411:9411"
       - "9943:9943"
   nike-test:
+
     build: NIKE-TEST/.
     depends_on:
       - splunk-otel-collector
