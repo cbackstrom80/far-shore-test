@@ -9,5 +9,5 @@ RUN pip install -r requirements.txt
 RUN mkdir /app
 WORKDIR /app
 COPY main.py /app
-COPY ../far-shore-config.yaml /app
+COPY far-shore-config.yaml /app
 

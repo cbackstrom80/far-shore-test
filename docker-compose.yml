@@ -23,7 +23,6 @@ services:
     build: NIKE-TEST/.
     depends_on:
       - splunk-otel-collector
-      - redis
 
 
     command: >

@@ -1,3 +1,0 @@
-curl -X GET "https://api.us1.signalfx.com/v1/timeserieswindow?query=nike.testing.metric:*" \
-    -H "Content-Type: application/json" \
-    -H "X-SF-Token: XnI5SWNNVv_uoCURsap5TA"

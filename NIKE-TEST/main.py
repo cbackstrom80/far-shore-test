@@ -21,7 +21,7 @@ with open("far-shore-config.yaml", "r") as yamlfile:
 REALM = data['farshore']['app']['options']['test-target-realm']
 LOCALE = data['farshore']['app']['options']['test-src-locale']
 METRICBASENAME = data['farshore']['app']['options']['test-metric-base-name']
-TOKEN = 'XnI5SWNNVv_uoCURsap5TA'
+TOKEN = data['farshore']['app']['options']['token']
 OTELCOLLECTORINGEST = data['farshore']['app']['options']['otelcollectoringest']
 SFXAPIURL = data['farshore']['app']['options']['sfx-api-url']
 

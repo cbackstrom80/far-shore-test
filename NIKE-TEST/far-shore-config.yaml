@@ -6,8 +6,9 @@ farshore:
                   enabled: False
             otelcollectoringest: http://splunk-otel-collector:9943
             latency-measure: local
-            test-src-locale: CN
-            test-target-realm: us1
+            test-src-locale: US
+            test-target-realm: us0
             test-metric-base-name: nike-testing-metric
             result-metric-name: nike-test-result
             sfx-api-url: https://api.us1.signalfx.com
+            token: SFX-INGEST-TOKEN-HERE
