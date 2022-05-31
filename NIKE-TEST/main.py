@@ -28,6 +28,7 @@ SFXAPIURL = data['farshore']['app']['options']['sfx-api-url']
 
 
 
+
 def http_get_with_requests(url: str, headers: Dict = {}, proxies: Dict = {}, timeout: int = 10) -> (int, Dict[str, Any], bytes):
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
 
@@ -88,7 +89,7 @@ async def sendmetric(randvalue):
 
     start_time = now.timestamp()
     payload = ingest.send(gauges=[{
-        'metric': 'nike.testing.metric',
+        'metric': METRICBASENAME,
         'value': start_time,
         'dimensions': {'source-locale': LOCALE,
                        'realm': REALM,
@@ -153,7 +154,7 @@ async def main():
     for i in range(0, 1):
 
         urls = [
-            "https://api.us1.signalfx.com/v1/timeserieswindow?query=sf_metric:nike.testing.metric AND randomvalue:{}".format(randvalue)
+            "https://api.us0.signalfx.com/v1/timeserieswindow?query=sf_metric:nike.testing.metric AND randomvalue:{}".format(randvalue)
             for i in range(0, 10)]
         results1, results2, t = await http_get_with_aiohttp_parallel(randvalue,  session, urls)
         print(results2)
